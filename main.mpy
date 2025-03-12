@@ -1,0 +1,170 @@
+# CONFIGS
+SSID="TestNet"
+PSWD="TestTest"
+IP="255.255.255.255"#"192.168.4.x"
+UDP_TX_PORT=5210
+UDP_RX_PORT=5211
+MESSAGE_BASE="ThisIs@LongAndVariedSt4ingToShowDataCont!nuity__@334d316g8g"
+PKTS_TO_SEND=1000
+TRIALS=20
+
+# Net control
+import network
+import socket
+
+# Board control
+from machine import Pin
+from time import sleep
+
+# Create globals
+net = network.WLAN(network.AP_IF)
+# sta = network.WLAN(network.STA_IF)
+# sta.active(True)
+pin = Pin("LED", Pin.OUT)
+pin.off()
+i = 0
+target_ip = '192.168.4.17'
+
+# Create network system
+def CreateNetwork():
+    SetNetStatus(True)
+    net.config(essid=SSID, password=PSWD)
+    net.ifconfig(('192.168.4.1', '255.255.255.0', '192.168.4.1', '8.8.8.8'))
+
+    if net.active():
+        print("Network creation successful")
+    else:
+        print("Failed to create network")
+        raise SystemExit
+def SetNetStatus(status):
+    net.active(status)
+def SendPacket(num):
+    zeros = 3-len(str(num))
+    msg = "0"*zeros + str(num)+str(MESSAGE_BASE)
+    # print(msg)
+    tx.sendto(msg.encode("utf-8"), (IP, UDP_TX_PORT))
+def PrintnetDebug():
+    print("-------------------- NETWORK STATUS --------------------")
+    print("Controller active:", net.active())
+    print("Controller ifconfig:", net.ifconfig() if net.active() else "N/A")
+    #c = net_controller.status('stations')  # This gives a list of connected mac addr
+    print(f"Connected Clients: {len(net.status('stations'))}")
+    print()
+
+CreateNetwork()
+SetNetStatus(True)
+# sta.connect(SSID, PSWD)
+# sleep(3)
+
+# Check network status
+if net.active():# and sta.isconnected():
+    print(net.ifconfig())
+
+# Look for network clients
+while len(net.status('stations')) == 0:
+    print("no clients have connected")
+    sleep(1)
+
+print("\nCLIENT CONNECTED --- AWAITING READINESS")
+pin.high()
+
+# Open send port
+tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+tx.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+print("TX Socket made")
+
+ready = False
+def toggle_ready(pin):
+    global ready
+    ready = not ready
+    print("\n READY RECIEVED --- STARTING TEST")
+
+def save_data():
+    print("All packets have been sent\n")
+
+
+button = Pin(15, Pin.IN, Pin.PULL_UP)
+# button = Pin(17, Pin.IN, Pin.PULL_UP)
+button.irq(trigger=Pin.IRQ_FALLING, handler=toggle_ready)
+
+test_counter = 0
+while True:
+    if not ready:
+        i=0
+        ready = bool(not button.value())
+        sleep(0.1)
+    elif i  < PKTS_TO_SEND:
+        try:
+            SendPacket(i)
+            i += 1
+            sleep(0.01)
+
+            if i % 5 == 0:
+                pin.toggle()
+                
+        except KeyboardInterrupt:
+            print("COWARD")
+            ready = False
+            break
+        except Exception as e:
+            print(str(e))
+            print("checking for client broke")
+            ready = False
+        except:
+            print("JUDEGMENT")
+            ready = False
+    if i >= PKTS_TO_SEND:
+        save_data()
+        ready = False
+        print("Sent: " + str(i) + " packets.")
+        test_counter += 1
+        i = 0
+        sleep(2)
+        if test_counter < TRIALS:
+            ready = True
+            print("Running another test")
+        else:
+            ready = False
+            test_counter = 0
+            print("Please swap out the material. All tests complete.")
+
+tx.close()
+pin.off()
+print("Finished.")
+
+
+
+
+
+
+
+
+
+
+
+# Open recieve port
+# rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# rx.bind(("0.0.0.0", UDP_RX_PORT))
+# print("RX Socket made")
+
+# Verify reciever is ready
+# ready = False
+# while not ready:
+#     try:
+#         print("1")
+#         data, target_ip = rx.recvfrom(1024)
+#         print("2")
+#         print(str(target_ip))
+#         print(str(data))
+#         print("4")
+#         if data.decode() == "READY TO RX":
+#             target_ip = target_ip[0]
+#             ready = True
+#     except KeyboardInterrupt:
+#         print("COWARD")
+#         break
+#     except OSError:
+#         print("check again")
+#         pass
+#     except:
+#         pass
